@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Role, Product, Order, OrderStatus, Table, CashRegister, Supplier, AttendanceRecord, OrderSource } from './types';
+import { User, Role, Product, Order, OrderStatus, Table, CashRegister, Supplier, AttendanceRecord, OrderSource, Customer } from './types';
 import { INITIAL_PRODUCTS, TABLES, MOCK_USERS } from './constants';
 import { Login } from './components/Login';
 import { WaiterTerminal } from './components/WaiterTerminal';
@@ -11,19 +11,18 @@ import { DeliveryPanel } from './components/DeliveryPanel';
 import { Header } from './components/Header';
 
 const App: React.FC = () => {
-  // State for Branding
   const [logoUrl, setLogoUrl] = useState<string>('https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/burros-mulas-logo.png');
   const [restaurantName, setRestaurantName] = useState<string>('BURROS & MULAS');
   const [accentColor, setAccentColor] = useState<string>('#33ccff');
   const [secondaryColor, setSecondaryColor] = useState<string>('#ff3399');
 
-  // Business logic state
   const [user, setUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [categories, setCategories] = useState<string[]>(['Hamburguesas', 'Tacos', 'Bebidas Virales', 'Postres']);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tables, setTables] = useState<Table[]>(TABLES);
   const [staff, setStaff] = useState<User[]>(MOCK_USERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   
@@ -35,7 +34,6 @@ const App: React.FC = () => {
     transactions: []
   });
 
-  // Load from LocalStorage
   useEffect(() => {
     const load = (key: string, fallback: any) => {
       const saved = localStorage.getItem(key);
@@ -47,6 +45,7 @@ const App: React.FC = () => {
     setProducts(load('gastro_products', INITIAL_PRODUCTS));
     setCategories(load('gastro_categories', categories));
     setStaff(load('gastro_staff', MOCK_USERS));
+    setCustomers(load('gastro_customers', []));
     setSuppliers(load('gastro_suppliers', []));
     setAttendance(load('gastro_attendance', []));
     setLogoUrl(load('gastro_logo', 'https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/burros-mulas-logo.png'));
@@ -55,13 +54,13 @@ const App: React.FC = () => {
     setSecondaryColor(load('gastro_color_secondary', '#ff3399'));
   }, []);
 
-  // Save to LocalStorage
   useEffect(() => {
     localStorage.setItem('gastro_orders', JSON.stringify(orders));
     localStorage.setItem('gastro_register', JSON.stringify(cashRegister));
     localStorage.setItem('gastro_products', JSON.stringify(products));
     localStorage.setItem('gastro_categories', JSON.stringify(categories));
     localStorage.setItem('gastro_staff', JSON.stringify(staff));
+    localStorage.setItem('gastro_customers', JSON.stringify(customers));
     localStorage.setItem('gastro_suppliers', JSON.stringify(suppliers));
     localStorage.setItem('gastro_attendance', JSON.stringify(attendance));
     localStorage.setItem('gastro_logo', JSON.stringify(logoUrl));
@@ -71,15 +70,26 @@ const App: React.FC = () => {
 
     document.documentElement.style.setProperty('--neon-blue', accentColor);
     document.documentElement.style.setProperty('--neon-pink', secondaryColor);
-  }, [orders, cashRegister, products, categories, staff, suppliers, attendance, logoUrl, restaurantName, accentColor, secondaryColor]);
+  }, [orders, cashRegister, products, categories, staff, customers, suppliers, attendance, logoUrl, restaurantName, accentColor, secondaryColor]);
 
   const handleLogin = (u: User) => setUser(u);
   const handleLogout = () => setUser(null);
 
   const addOrder = useCallback((newOrder: Order) => {
     setOrders(prev => [...prev, newOrder]);
+    
     if (newOrder.source === 'DINE_IN' && newOrder.tableId) {
       setTables(prev => prev.map(t => t.id === newOrder.tableId ? { ...t, status: 'OCCUPIED' } : t));
+    }
+    
+    if (newOrder.customerPhone) {
+      setCustomers(prev => {
+        const existing = prev.find(c => c.phone === newOrder.customerPhone);
+        if (existing) {
+          return prev.map(c => c.phone === newOrder.customerPhone ? { ...c, visits: c.visits + 1, lastVisit: Date.now() } : c);
+        }
+        return [...prev, { id: `c_${Date.now()}`, name: newOrder.customerName || 'Cliente', phone: newOrder.customerPhone || '', visits: 1, lastVisit: Date.now() }];
+      });
     }
     
     setProducts(prev => prev.map(p => {
@@ -99,14 +109,10 @@ const App: React.FC = () => {
     setOrders(prev => {
       const targetOrder = prev.find(o => o.id === orderId);
       if (!targetOrder) return prev;
-
       if (status === OrderStatus.PAID) {
         if (targetOrder.source === 'DINE_IN' && targetOrder.tableId) {
-          // Liberar mesa
           setTables(tPrev => tPrev.map(t => t.id === targetOrder.tableId ? { ...t, status: 'FREE' } : t));
         }
-        
-        // Registrar transacción
         const income = targetOrder.total + (targetOrder.tipAmount || 0);
         setCashRegister(cPrev => ({
           ...cPrev,
@@ -120,7 +126,6 @@ const App: React.FC = () => {
           }]
         }));
       }
-
       return prev.map(o => o.id === orderId ? { ...o, status } : o);
     });
   };
@@ -139,7 +144,6 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!user) return <Login onLogin={handleLogin} users={staff} logoUrl={logoUrl} restaurantName={restaurantName} />;
-
     switch (user.role) {
       case 'WAITER':
         return (
@@ -158,6 +162,7 @@ const App: React.FC = () => {
             orders={orders} cashRegister={cashRegister} 
             onCashAction={handleCashAction} tables={tables}
             staff={staff} setStaff={setStaff}
+            customers={customers} setCustomers={setCustomers}
             suppliers={suppliers} setSuppliers={setSuppliers}
             attendance={attendance} setAttendance={setAttendance}
             logoUrl={logoUrl} setLogoUrl={setLogoUrl}
@@ -167,7 +172,7 @@ const App: React.FC = () => {
           />
         );
       case 'CUSTOMER':
-        return <CustomerSelfService tables={tables} products={products} categories={categories} onAddOrder={addOrder} onUpdateOrder={updateOrder} orders={orders} onUpdateStatus={updateOrderStatus} onLogout={handleLogout} logoUrl={logoUrl} restaurantName={restaurantName} />;
+        return <CustomerSelfService customers={customers} tables={tables} products={products} categories={categories} onAddOrder={addOrder} onUpdateOrder={updateOrder} orders={orders} onUpdateStatus={updateOrderStatus} onLogout={handleLogout} logoUrl={logoUrl} restaurantName={restaurantName} />;
       default:
         return <div>Rol no reconocido</div>;
     }

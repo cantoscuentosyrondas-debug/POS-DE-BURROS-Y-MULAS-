@@ -10,6 +10,15 @@ export interface User {
   photo?: string;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  visits: number;
+  lastVisit: number;
+  hasPlayedRoulette?: boolean;
+}
+
 export type OrderSource = 'DINE_IN' | 'DELIVERY_OWN' | 'UBER_EATS' | 'RAPPI' | 'DIDI_FOOD' | 'PICKUP';
 
 export interface AttendanceRecord {
@@ -78,7 +87,6 @@ export interface Order {
   total: number;
   source: OrderSource;
   estimatedTime?: number;
-  // Campos para el checkout
   billRequested?: boolean;
   paymentMethod?: 'CASH' | 'CARD';
   tipAmount?: number;
