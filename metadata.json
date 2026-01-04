@@ -1,0 +1,8 @@
+{
+  "name": "Burros & Mulas POS",
+  "description": "Punto de venta neón con auto-servicio para clientes, incluyendo check-in con foto y ubicación.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
