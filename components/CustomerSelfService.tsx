@@ -27,7 +27,13 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
   customers, tables, products, categories, onAddOrder, onUpdateOrder, orders, onUpdateStatus, onLogout, logoUrl, restaurantName 
 }) => {
   const [step, setStep] = useState<'WELCOME' | 'TABLE_CHOICE' | 'SETUP' | 'MENU' | 'ROULETTE' | 'SUCCESS' | 'VIEW_BILL' | 'CHECKOUT'>('WELCOME');
-  const [customerData, setCustomerData] = useState({ name: '', phone: '', table: '' });
+  const [customerData, setCustomerData] = useState({ 
+    name: '', 
+    phone: '', 
+    table: '', 
+    peopleCount: 1,
+    accountType: 'SINGLE' as 'SINGLE' | 'SEPARATE'
+  });
   const [isExistingTable, setIsExistingTable] = useState(false);
   
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -52,7 +58,7 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
         setStep('MENU');
       }
     }
-  }, []);
+  }, [orders]);
 
   const myOrders = orders.filter(o => o.tableId === customerData.table && o.status !== OrderStatus.PAID);
   const subtotal = myOrders.reduce((sum, order) => sum + order.total, 0);
@@ -75,30 +81,31 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
   };
 
   const validateAndEnter = () => {
-    if (!customerData.name || !customerData.phone || !customerData.table) return alert("Ingresa todos tus datos.");
+    if (!customerData.name.trim() || !customerData.phone.trim() || !customerData.table) {
+      return alert("Por favor completa todos los campos para continuar.");
+    }
     
-    // Saltamos la verificación y entramos directo al menú
+    const table = tables.find(t => t.id === customerData.table);
+    
     if (isExistingTable) {
         const order = orders.find(o => o.tableId === customerData.table && o.status !== OrderStatus.PAID);
         if (order) {
             setStep('MENU');
             localStorage.setItem('bm_customer_session', JSON.stringify(customerData));
         } else {
-            alert("No hay una cuenta activa en esa mesa.");
+            alert("No encontramos una cuenta activa en esa mesa. Elige 'Soy mesa nueva'.");
         }
     } else {
-        const table = tables.find(t => t.id === customerData.table);
-        if (table?.status === 'FREE') {
+        if (table?.status === 'FREE' || table?.status === 'RESERVED') {
             setStep('MENU');
             localStorage.setItem('bm_customer_session', JSON.stringify(customerData));
         } else {
-            alert("Mesa ocupada. Elige otra.");
+            alert("Mesa ocupada. Por favor elige otra o selecciona 'Ya estoy consumiendo'.");
         }
     }
   };
 
   const startOrderFlow = () => {
-    // Verificamos si es un cliente nuevo (no está en la lista) y no ha jugado
     const isNew = !customers.find(c => c.phone === customerData.phone);
     const hasPlayedLocal = localStorage.getItem(`played_${customerData.phone}`) === 'true';
     
@@ -141,6 +148,8 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
       total: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0),
       customerName: customerData.name, 
       customerPhone: customerData.phone, 
+      peopleCount: customerData.peopleCount,
+      accountType: customerData.accountType,
       source: 'DINE_IN'
     };
     onAddOrder(newOrder);
@@ -149,7 +158,7 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
   };
 
   const requestFinalBill = () => {
-    if (!paymentMethod) return alert("Elige método de pago.");
+    if (!paymentMethod) return alert("Por favor elige un método de pago.");
     myOrders.forEach(order => {
         onUpdateOrder({
             ...order,
@@ -159,7 +168,7 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
             tipAmount: order === myOrders[myOrders.length - 1] ? tipAmount : 0
         });
     });
-    alert(`¡Mesero notificado! Tu cuenta es de $${finalTotal}.`);
+    alert(`¡Mesero notificado! Tu cuenta total es de $${finalTotal}.`);
     localStorage.removeItem('bm_customer_session');
     onLogout();
   };
@@ -202,38 +211,61 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
   if (step === 'SETUP') {
     return (
       <div className="max-w-md mx-auto py-10 space-y-8 animate-in slide-in-from-bottom">
-        <h2 className="font-neon text-2xl text-center text-white uppercase">{isExistingTable ? 'Validar mi Sesión' : 'Bienvenido al Menú'}</h2>
-        <div className="bg-[#111] p-10 rounded-[3rem] border border-slate-800 space-y-6 shadow-2xl">
+        <h2 className="font-neon text-2xl text-center text-white uppercase">{isExistingTable ? 'Validar mi Sesión' : 'Configurar mi Mesa'}</h2>
+        <div className="bg-[#111] p-10 rounded-[3rem] border border-slate-800 space-y-6 shadow-2xl overflow-y-auto max-h-[80vh] scrollbar-hide">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Tu Nombre:</label>
             <input className="w-full bg-black border border-slate-700 p-4 rounded-2xl text-white font-bold outline-none focus:border-blue-500" placeholder="Ejem: Juan Pérez" value={customerData.name} onChange={e => setCustomerData({...customerData, name: e.target.value})} />
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">WhatsApp (Para tu Regalo):</label>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">WhatsApp:</label>
             <input className="w-full bg-black border border-slate-700 p-4 rounded-2xl text-white font-bold outline-none focus:border-blue-500" placeholder="Número de celular" value={customerData.phone} onChange={e => setCustomerData({...customerData, phone: e.target.value})} />
-            <p className="text-[8px] text-slate-600 font-bold uppercase ml-4 italic">¡Gana premios en tu primer pedido!</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Comensales:</label>
+              <input type="number" min="1" max="20" className="w-full bg-black border border-slate-700 p-4 rounded-2xl text-white font-bold outline-none focus:border-blue-500 text-center" value={customerData.peopleCount} onChange={e => setCustomerData({...customerData, peopleCount: parseInt(e.target.value) || 1})} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Mesa:</label>
+              <select 
+                className="w-full bg-black border border-slate-700 p-4 rounded-2xl text-white font-black uppercase text-xs outline-none focus:border-blue-500 cursor-pointer" 
+                value={customerData.table} 
+                onChange={e => setCustomerData({...customerData, table: e.target.value})}
+              >
+                  <option value="">-- ELIGE --</option>
+                  {tables.map(t => {
+                      const isOccupied = t.status === 'OCCUPIED';
+                      if (isExistingTable) {
+                          return <option key={t.id} value={t.id} disabled={!isOccupied}>Mesa #{t.number} {isOccupied ? '(Activa)' : '(Sin cuenta)'}</option>
+                      }
+                      return <option key={t.id} value={t.id} disabled={isOccupied}>Mesa #{t.number} {isOccupied ? '(Ocupada)' : '(Disponible)'}</option>
+                  })}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Número de Mesa:</label>
-            <select 
-              className="w-full bg-black border border-slate-700 p-4 rounded-2xl text-white font-black uppercase text-xs outline-none focus:border-blue-500" 
-              value={customerData.table} 
-              onChange={e => setCustomerData({...customerData, table: e.target.value})}
-            >
-                <option value="">-- ELIGE TU MESA --</option>
-                {tables.map(t => {
-                    const isOccupied = t.status === 'OCCUPIED';
-                    if (isExistingTable) {
-                        return <option key={t.id} value={t.id} disabled={!isOccupied}>Mesa {t.number} {isOccupied ? '(Activa)' : '(Vacía)'}</option>
-                    }
-                    return <option key={t.id} value={t.id} disabled={isOccupied}>Mesa {t.number} {isOccupied ? '(Ocupada)' : '(Disponible)'}</option>
-                })}
-            </select>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Formato de Cuenta:</label>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setCustomerData({...customerData, accountType: 'SINGLE'})}
+                className={`flex-1 py-4 rounded-2xl font-black text-[9px] uppercase border transition-all ${customerData.accountType === 'SINGLE' ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-black border-slate-800 text-slate-500'}`}
+              >
+                Cuenta Única
+              </button>
+              <button 
+                onClick={() => setCustomerData({...customerData, accountType: 'SEPARATE'})}
+                className={`flex-1 py-4 rounded-2xl font-black text-[9px] uppercase border transition-all ${customerData.accountType === 'SEPARATE' ? 'bg-pink-600 border-pink-400 text-white shadow-lg' : 'bg-black border-slate-800 text-slate-500'}`}
+              >
+                Por Separado
+              </button>
+            </div>
           </div>
 
-          <button onClick={validateAndEnter} className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase text-white tracking-widest shadow-xl active:scale-95 transition-all">ENTRAR AL MENÚ</button>
+          <button onClick={validateAndEnter} className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase text-white tracking-widest shadow-xl active:scale-95 transition-all">ACCEDER AL MENÚ</button>
         </div>
       </div>
     );
@@ -247,7 +279,7 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
              <div className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center font-black">M{customerData.table.replace('t','')}</div>
              <div className="flex flex-col">
                 <p className="font-black text-[10px] uppercase text-white leading-none truncate max-w-[120px]">{customerData.name}</p>
-                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Sesión VIP</p>
+                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">{customerData.peopleCount} Pers. | {customerData.accountType === 'SINGLE' ? 'Única' : 'Sep.'}</p>
              </div>
           </div>
           <button onClick={() => setStep('VIEW_BILL')} className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-pink-500 shadow-lg"><i className="fas fa-receipt text-lg"></i></button>

@@ -10,15 +10,20 @@ interface KitchenDisplayProps {
 
 export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({ orders, products, onUpdateStatus }) => {
   const [activeTab, setActiveTab] = useState<'TICKETS' | 'RECIPES'>('TICKETS');
-  const prevOrderCount = useRef(orders.length);
+  
+  // Usamos el total de items y el timestamp de la última actualización para saber si hay algo nuevo
+  const totalItemsCount = orders.reduce((acc, o) => acc + o.items.length, 0);
+  const prevItemsCount = useRef(totalItemsCount);
+  const lastUpdateRef = useRef(0);
 
   useEffect(() => {
-    if (orders.length > prevOrderCount.current) {
+    // Si aumenta el número de items totales o el número de tickets, algo nuevo llegó
+    if (totalItemsCount > prevItemsCount.current) {
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.play().catch(e => console.log("Audio interaction required"));
     }
-    prevOrderCount.current = orders.length;
-  }, [orders.length]);
+    prevItemsCount.current = totalItemsCount;
+  }, [totalItemsCount, orders.length]);
 
   return (
     <div className="space-y-8 pb-32">
@@ -49,12 +54,14 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({ orders, products
       {activeTab === 'TICKETS' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {orders.map(order => {
-            const hasNotes = order.items.some(i => i.notes && i.notes.trim() !== '');
+            const hasNotes = order.items.some(i => i.notes && i.notes.trim() !== '' && i.notes !== 'Con todo');
+            const isUpdated = order.updatedAt && order.updatedAt > order.timestamp;
+            
             return (
               <div 
                 key={order.id} 
                 className={`bg-[#111] rounded-[3rem] shadow-2xl overflow-hidden border-2 flex flex-col transform transition-all animate-in zoom-in duration-300 ${
-                  hasNotes ? 'border-yellow-400 ring-4 ring-yellow-400/20 animate-pulse' : 'border-slate-800'
+                  isUpdated ? 'border-blue-500 ring-4 ring-blue-500/10' : (hasNotes ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-800')
                 }`}
               >
                 <div className={`p-6 flex justify-between items-center ${order.status === OrderStatus.PENDING ? 'bg-pink-600 shadow-lg shadow-pink-600/20' : 'bg-blue-600 shadow-lg shadow-blue-600/20'} text-white`}>
@@ -62,36 +69,44 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({ orders, products
                     <span className="text-4xl font-black font-neon leading-none">
                       {order.source === 'DINE_IN' ? `M-${order.tableId?.replace('t', '')}` : 'DELV'}
                     </span>
-                    <span className="text-[8px] font-black uppercase tracking-widest mt-1 opacity-70">
-                      {order.customerName} - {order.source}
-                    </span>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                        {order.customerName}
+                      </span>
+                      {isUpdated && (
+                        <span className="bg-white text-blue-600 px-2 py-0.5 rounded text-[7px] font-black animate-pulse">ACTUALIZADO</span>
+                      )}
+                    </div>
                   </div>
-                  {hasNotes && (
+                  {(hasNotes || isUpdated) && (
                     <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-pink-600 shadow-xl">
-                       <i className="fas fa-exclamation-triangle text-xl"></i>
+                       <i className={`fas ${isUpdated ? 'fa-sync-alt animate-spin-slow' : 'fa-exclamation-triangle'} text-xl`}></i>
                     </div>
                   )}
                 </div>
                 <div className="p-8 flex-1 space-y-6">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className={`flex flex-col space-y-2 border-b border-slate-800/50 pb-4 last:border-0 last:pb-0 ${item.notes ? 'bg-yellow-400/5 -mx-4 px-4 py-3 rounded-2xl' : ''}`}>
-                      <div className="flex items-start space-x-4">
-                        <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${item.notes ? 'bg-yellow-400 text-black' : 'bg-white text-black'}`}>
-                          {item.quantity}
-                        </span>
-                        <span className={`font-black uppercase text-sm leading-tight block ${item.notes ? 'text-yellow-400' : 'text-white'}`}>
-                          {item.name}
-                        </span>
-                      </div>
-                      {item.notes && (
-                        <div className="bg-yellow-400 p-3 rounded-xl shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                          <p className="text-[12px] text-black font-black uppercase italic leading-tight">
-                            ⚠️ OBSERVACIÓN: {item.notes}
-                          </p>
+                  {order.items.map((item, idx) => {
+                    const isNewItem = isUpdated && idx >= (order.items.length - (prevItemsCount.current > 0 ? 1 : 0)); // Aproximación visual de nuevo item
+                    return (
+                      <div key={idx} className={`flex flex-col space-y-2 border-b border-slate-800/50 pb-4 last:border-0 last:pb-0 ${item.notes && item.notes !== 'Con todo' ? 'bg-yellow-400/5 -mx-4 px-4 py-3 rounded-2xl' : ''}`}>
+                        <div className="flex items-start space-x-4">
+                          <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${item.notes && item.notes !== 'Con todo' ? 'bg-yellow-400 text-black' : 'bg-white text-black'}`}>
+                            {item.quantity}
+                          </span>
+                          <span className={`font-black uppercase text-sm leading-tight block ${item.notes && item.notes !== 'Con todo' ? 'text-yellow-400' : 'text-white'}`}>
+                            {item.name}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {item.notes && item.notes !== 'Con todo' && (
+                          <div className="bg-yellow-400 p-3 rounded-xl shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                            <p className="text-[12px] text-black font-black uppercase italic leading-tight">
+                              ⚠️ NOTA: {item.notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="p-6 bg-black mt-auto">
                    <button 

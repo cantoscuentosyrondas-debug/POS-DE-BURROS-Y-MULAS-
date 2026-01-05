@@ -34,7 +34,7 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
-export const TABLES: Table[] = Array.from({ length: 15 }, (_, i) => ({
+export const TABLES: Table[] = Array.from({ length: 10 }, (_, i) => ({
   id: `t${i + 1}`,
   number: i + 1,
   status: 'FREE'
