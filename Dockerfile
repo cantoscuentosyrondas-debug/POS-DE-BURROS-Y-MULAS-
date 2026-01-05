@@ -9,5 +9,5 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 RUN npm install -g serve
-COPY --from=builder /app/dist /app
-CMD ["serve", "-s", "/app", "-l", "3000"]
+COPY --from=builder /app/dist .
+CMD ["serve", "-s", ".", "-l", "3000"]
