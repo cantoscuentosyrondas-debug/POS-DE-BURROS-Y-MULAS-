@@ -139,20 +139,39 @@ export const CustomerSelfService: React.FC<CustomerSelfServiceProps> = ({
       localStorage.setItem(`played_${customerData.phone}`, 'true');
     }
 
-    const newOrder: Order = {
-      id: `self_${Date.now()}`, 
-      tableId: customerData.table, 
-      items: orderItems,
-      status: OrderStatus.PENDING, 
-      timestamp: Date.now(),
-      total: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-      customerName: customerData.name, 
-      customerPhone: customerData.phone, 
-      peopleCount: customerData.peopleCount,
-      accountType: customerData.accountType,
-      source: 'DINE_IN'
-    };
-    onAddOrder(newOrder);
+    // BUSCAR SI YA HAY UNA ORDEN ABIERTA PARA ESTA MESA
+    const existingOrder = orders.find(o => o.tableId === customerData.table && o.status !== OrderStatus.PAID);
+
+    if (existingOrder) {
+      // ACTUALIZAR ORDEN EXISTENTE (Fusionar productos extras)
+      const additionalTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      const updatedOrder: Order = {
+        ...existingOrder,
+        items: [...existingOrder.items, ...orderItems],
+        total: existingOrder.total + additionalTotal,
+        status: OrderStatus.PENDING, // Volver a pendiente para que cocina lo vea
+        updatedAt: Date.now()
+      };
+      onUpdateOrder(updatedOrder);
+    } else {
+      // CREAR NUEVA ORDEN
+      const newOrder: Order = {
+        id: `self_${Date.now()}`, 
+        tableId: customerData.table, 
+        items: orderItems,
+        status: OrderStatus.PENDING, 
+        timestamp: Date.now(),
+        updatedAt: Date.now(),
+        total: orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0),
+        customerName: customerData.name, 
+        customerPhone: customerData.phone, 
+        peopleCount: customerData.peopleCount,
+        accountType: customerData.accountType,
+        source: 'DINE_IN'
+      };
+      onAddOrder(newOrder);
+    }
+
     setCart([]);
     setStep('SUCCESS');
   };

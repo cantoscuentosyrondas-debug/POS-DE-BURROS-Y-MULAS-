@@ -1,6 +1,6 @@
 {
-  "name": "Burros & Mulas POS",
-  "description": "Punto de venta neón con auto-servicio para clientes, incluyendo check-in con foto y ubicación.",
+  "name": "Burros & Mulas POS Platinum",
+  "description": "Punto de venta neón optimizado para alta velocidad en Cloud Run. Incluye sincronización atómica multi-módulo.",
   "requestFramePermissions": [
     "camera",
     "geolocation"

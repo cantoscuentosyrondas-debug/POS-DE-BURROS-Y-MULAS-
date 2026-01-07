@@ -16,30 +16,9 @@ export interface Customer {
   phone: string;
   visits: number;
   lastVisit: number;
-  hasPlayedRoulette?: boolean;
 }
 
 export type OrderSource = 'DINE_IN' | 'DELIVERY_OWN' | 'UBER_EATS' | 'RAPPI' | 'DIDI_FOOD' | 'PICKUP';
-
-export interface AttendanceRecord {
-  id: string;
-  userId: string;
-  userName: string;
-  checkIn: number;
-  checkOut?: number;
-  date: string;
-}
-
-export interface Supplier {
-  id: string;
-  businessName: string;
-  category: string;
-  contactName: string;
-  phone: string;
-  location: string;
-  deliveryDays: string[];
-  method: 'DELIVERY' | 'PICKUP';
-}
 
 export interface Product {
   id: string;
@@ -49,17 +28,14 @@ export interface Product {
   stock: number;
   image: string;
   description: string;
-  instructions?: string;
-  isPromo?: boolean;
-  originalPrice?: number;
 }
 
+// Added IN_TRANSIT status for delivery workflow tracking
 export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
   READY = 'READY',
   IN_TRANSIT = 'IN_TRANSIT',
-  SERVED = 'SERVED',
   PAID = 'PAID',
   CANCELLED = 'CANCELLED'
 }
@@ -70,6 +46,7 @@ export interface OrderItem {
   price: number;
   name: string;
   notes?: string;
+  isNew?: boolean; // Para marcar items recién añadidos por cliente
 }
 
 export interface Order {
@@ -81,13 +58,11 @@ export interface Order {
   updatedAt?: number;
   customerName?: string;
   customerPhone?: string;
-  customerAddress?: string;
+  customerAddress?: string; // Added to support delivery orders
   peopleCount?: number;
-  accountType?: 'SINGLE' | 'SEPARATE';
-  waiterId?: string;
+  accountType?: 'SINGLE' | 'SEPARATE'; // Added for customer self-service billing preferences
   total: number;
   source: OrderSource;
-  estimatedTime?: number;
   billRequested?: boolean;
   paymentMethod?: 'CASH' | 'CARD';
   tipAmount?: number;
@@ -103,17 +78,24 @@ export interface Table {
 export interface CashRegister {
   id: string;
   isOpen: boolean;
-  openedAt?: number;
-  closedAt?: number;
   initialBalance: number;
   currentBalance: number;
-  transactions: Transaction[];
+  transactions: any[];
 }
 
-export interface Transaction {
+// Added missing Supplier interface for Admin management
+export interface Supplier {
   id: string;
-  type: 'IN' | 'OUT';
-  amount: number;
-  description: string;
+  name: string;
+  phone: string;
+  email?: string;
+  category: string;
+}
+
+// Added missing AttendanceRecord interface for staff management
+export interface AttendanceRecord {
+  id: string;
+  userId: string;
   timestamp: number;
+  type: 'IN' | 'OUT';
 }
